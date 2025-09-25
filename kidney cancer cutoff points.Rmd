@@ -1,0 +1,914 @@
+---
+title: "Rmarkdown for optimal cutoffpoints based on survival for TSM and TAT"
+output:
+  pdf_document: default
+  html_document: default
+date: "2025-01-14"
+---
+
+##make sure to install and run the libraries 
+```{r}
+options(repos = c(CRAN = "https://cloud.r-project.org"))
+install.packages("survMisc")
+install.packages("survival")
+install.packages("survminer")
+
+library(survival)
+library(survminer)
+library(haven)
+```
+
+
+##importing dataset (originally was in SAS format)
+```{r}
+tcga_data <- "read_sas("C:/Users/Mahe22/OneDrive - The Ohio State University Wexner Medical Center/4. Kidney Cancer Project/tcga_co.sas7bdat"import data",
+NULL)
+```
+
+
+# Filter the dataset by Gender
+```{r}
+tcga_female <- subset(tcga_data, gender == "female")
+
+tcga_male <- subset(tcga_data, gender == "male")
+
+```
+
+
+# Perform surv_cutpoint analysis on the filtered female dataset TSM then TAT
+```{r}
+max_stattsm_f <- surv_cutpoint(
+data = tcga_female,
+time = "Followup",   # Column name for follow-up time
+event = "Event",     # Column name for event status
+variables = "Muscle" # Column name for the muscle variable
+)
+
+plot(max_stattsm_f)
+
+
+max_stattat_f <- surv_cutpoint(
+data = tcga_female,
+time = "Followup",   # Column name for follow-up time
+event = "Event",     # Column name for event status
+variables = "TAT" # Column name for the muscle variable
+)
+
+plot(max_stattat_f)
+
+```
+
+
+# Apply the cutpoint to categorize the muscle and TAT variable of female
+```{r}
+tcga_female$Muscle_group <- ifelse(tcga_female$Muscle >= max_stattsm_f$cutpoint$cutpoint, "Low", "High")
+
+tcga_female$TAT_group <- ifelse(tcga_female$TAT >= max_stattat_f$cutpoint$cutpoint, "Low", "High")
+```
+
+
+# Create the survival object of female
+```{r}
+surv_object_f <- Surv(time = tcga_female$Followup, event = tcga_female$Event)
+```
+
+
+# Plot the survival curves of female 
+```{r}
+ggsurvplot(
+fit = survfit(surv_object_f ~ Muscle_group, data = tcga_female),
+data = tcga_female,
+pval = TRUE,          # Show p-value
+risk.table = TRUE,    # Show risk table
+ggtheme = theme_minimal(),  # Use a minimal theme
+title = "Survival Curves by Muscle Group female",
+xlab = "Time (Days)", # X-axis label
+ylab = "Survival Probability", # Y-axis label
+legend.title = "Muscle Group",
+legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+
+ggsurvplot(
+fit = survfit(surv_object_f ~ TAT_group, data = tcga_female),
+data = tcga_female,
+pval = TRUE,          # Show p-value
+risk.table = TRUE,    # Show risk table
+ggtheme = theme_minimal(),  # Use a minimal theme
+title = "Survival Curves by TAT Group female",
+xlab = "Time (Days)", # X-axis label
+ylab = "Survival Probability", # Y-axis label
+legend.title = "TAT Group",
+legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+```
+
+
+# Perform surv_cutpoint analysis on the filtered male dataset
+```{r}
+max_stattsm_m <- surv_cutpoint(
+data = tcga_male,
+time = "Followup",   # Column name for follow-up time
+event = "Event",     # Column name for event status
+variables = "Muscle" # Column name for the muscle variable
+)
+
+plot(max_stattsm_m)
+
+max_stattat_m <- surv_cutpoint(
+data = tcga_male,
+time = "Followup",   # Column name for follow-up time
+event = "Event",     # Column name for event status
+variables = "TAT" # Column name for the muscle variable
+)
+
+plot(max_stattat_m)
+
+```
+
+
+
+# Apply the cutpoint to categorize the muscle and TAT variable of female
+```{r}
+tcga_male$Muscle_group <- ifelse(tcga_male$Muscle >= max_stattsm_m$cutpoint$cutpoint, "Low", "High")
+
+tcga_male$TAT_group <- ifelse(tcga_male$TAT >= max_stattat_m$cutpoint$cutpoint, "Low", "High")
+```
+
+
+
+# Create the survival object of male
+```{r}
+surv_object_m <- Surv(time = tcga_male$Followup, event = tcga_male$Event)
+```
+
+
+
+
+# Plot the survival curves of male 
+```{r}
+ggsurvplot(
+fit = survfit(surv_object_m ~ Muscle_group, data = tcga_male),
+data = tcga_male,
+pval = TRUE,          # Show p-value
+risk.table = TRUE,    # Show risk table
+ggtheme = theme_minimal(),  # Use a minimal theme
+title = "Survival Curves by Muscle Group male",
+xlab = "Time (Days)", # X-axis label
+ylab = "Survival Probability", # Y-axis label
+legend.title = "Muscle Group",
+legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+
+ggsurvplot(
+fit = survfit(surv_object_m ~ TAT_group, data = tcga_male),
+data = tcga_male,
+pval = TRUE,          # Show p-value
+risk.table = TRUE,    # Show risk table
+ggtheme = theme_minimal(),  # Use a minimal theme
+title = "Survival Curves by TAT Group male",
+xlab = "Time (Days)", # X-axis label
+ylab = "Survival Probability", # Y-axis label
+legend.title = "TAT Group",
+legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+```
+
+
+
+# # Merge the two subsets (female and male)
+```{r}
+tcga_merged <- rbind(tcga_female, tcga_male)
+
+```
+
+
+# Create the survival object
+```{r}
+surv_object <- Surv(time = tcga_merged$Followup, event = tcga_merged$Event)
+
+```
+
+# Plot the survival curves
+```{r}
+ggsurvplot(
+fit = survfit(surv_object ~ Muscle_group, data = tcga_merged),
+data = tcga_merged,
+pval = TRUE,          # Show p-value
+risk.table = TRUE,    # Show risk table
+ggtheme = theme_minimal(),  # Use a minimal theme
+title = "Kaplan-Meier Graph Based on Skeletal Muscle",
+xlab = "Time (Days)", # X-axis label
+ylab = "Survival Probability", # Y-axis label
+legend.title = "Skeleal Muscle",
+legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+
+ggsurvplot(
+fit = survfit(surv_object ~ TAT_group, data = tcga_merged),
+data = tcga_merged,
+pval = TRUE,          # Show p-value
+risk.table = TRUE,    # Show risk table
+ggtheme = theme_minimal(),  # Use a minimal theme
+title = "Kaplan-Meier Graph Based on the Total Adiposity",
+xlab = "Time (Days)", # X-axis label
+ylab = "Survival Probability", # Y-axis label
+legend.title = "Total Adiposity",
+legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+```
+
+#bodycomposition groups
+
+```{r}
+tcga_merged$bctype <- ifelse(tcga_merged$Muscle_group == "High" & tcga_merged$TAT_group == "Low", 
+                           "L.M.+H.A.",
+                    ifelse(tcga_merged$Muscle_group == "High" & tcga_merged$TAT_group == "High", 
+                           "L.M.+L.A.",
+                    ifelse(tcga_merged$Muscle_group == "Low" & tcga_merged$TAT_group == "Low", 
+                           "H.M.+H.A.",
+                    ifelse(tcga_merged$Muscle_group == "Low" & tcga_merged$TAT_group == "High", 
+                           "H.M.+L.A.", NA))))
+
+```
+
+# Plot the survival curves
+```{r}
+ggsurvplot(
+fit = survfit(surv_object ~ bctype, data = tcga_merged),
+data = tcga_merged,
+pval = TRUE,          # Show p-value
+risk.table = TRUE,    # Show risk table
+ggtheme = theme_minimal(),  # Use a minimal theme
+title = "Kaplan-Meier Graph Based on Body composition",
+xlab = "Time (Days)", # X-axis label
+ylab = "Survival Probability", # Y-axis label
+legend.title = "Body Composition",
+legend.labs = c("H.M.+H.A.", "H.M.+L.A.","L.M.+H.A.", "L.M.+L.A."), # Labels for the groups
+)
+
+```
+
+#significant proteins categorization by optimal cutoffs based on survival LKB1
+```{r}
+# Perform surv_cutpoint analysis on the filtered dataset
+max_statPREX1 <- surv_cutpoint(
+    data = tcga_merged ,
+    time = "Followup",   # Column name for follow-up time
+    event = "Event",     # Column name for event status
+    variables = "PREX1" # Column name for the muscle variable
+)
+
+
+plot(max_statPREX1)
+
+# Apply the cutpoint 
+tcga_merged$PREX1_group <- ifelse(tcga_merged$PREX1 >= max_statPREX1$cutpoint$cutpoint, "High", "Low")
+
+
+# Plot the survival curves
+ggsurvplot(
+    fit = survfit(surv_object ~ PREX1_group, data = tcga_merged),
+    data = tcga_merged,
+    pval = TRUE,          # Show p-value
+    risk.table = TRUE,    # Show risk table
+    ggtheme = theme_minimal(),  # Use a minimal theme
+    title = "Survival Curves by LKB1 Group",
+    xlab = "Time (Days)", # X-axis label
+    ylab = "Survival Probability", # Y-axis label
+    legend.title = "PREX1 Group",
+    legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+
+
+```
+
+
+#significant proteins categorization by optimal cutoffs based on survival NF2
+```{r}
+# Perform surv_cutpoint analysis on the filtered dataset
+max_statNF2 <- surv_cutpoint(
+    data = tcga_merged ,
+    time = "Followup",   # Column name for follow-up time
+    event = "Event",     # Column name for event status
+    variables = "NF2" # Column name for the muscle variable
+)
+
+
+plot(max_statNF2)
+
+# Apply the cutpoint 
+tcga_merged$NF2_group <- ifelse(tcga_merged$NF2 >= max_statNF2$cutpoint$cutpoint, "Low", "High")
+
+
+# Plot the survival curves
+ggsurvplot(
+    fit = survfit(surv_object ~ NF2_group, data = tcga_merged),
+    data = tcga_merged,
+    pval = TRUE,          # Show p-value
+    risk.table = TRUE,    # Show risk table
+    ggtheme = theme_minimal(),  # Use a minimal theme
+    title = "Survival Curves by nf2 Group",
+    xlab = "Time (Days)", # X-axis label
+    ylab = "Survival Probability", # Y-axis label
+    legend.title = "NF2 Group",
+    legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+
+
+```
+
+
+
+#significant proteins categorization by optimal cutoffs based on survival P_Cadherin
+```{r}
+# Perform surv_cutpoint analysis on the filtered dataset
+max_statP_Cadherin<- surv_cutpoint(
+    data = tcga_merged ,
+    time = "Followup",   # Column name for follow-up time
+    event = "Event",     # Column name for event status
+    variables = "P_Cadherin" # Column name for the muscle variable
+)
+
+
+plot(max_statP_Cadherin)
+
+# Apply the cutpoint 
+tcga_merged$P_Cadherin_group <- ifelse(tcga_merged$P_Cadherin >= max_statP_Cadherin$cutpoint$cutpoint, "Low", "High")
+
+
+# Plot the survival curves
+ggsurvplot(
+    fit = survfit(surv_object ~ P_Cadherin_group, data = tcga_merged),
+    data = tcga_merged,
+    pval = TRUE,          # Show p-value
+    risk.table = TRUE,    # Show risk table
+    ggtheme = theme_minimal(),  # Use a minimal theme
+    title = "Survival Curves by P_Cadherin Group",
+    xlab = "Time (Days)", # X-axis label
+    ylab = "Survival Probability", # Y-axis label
+    legend.title = "P_Cadherin Group",
+    legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+
+
+```
+
+
+
+#significant proteins categorization by optimal cutoffs based on survival Caspase_3
+```{r}
+# Perform surv_cutpoint analysis on the filtered dataset
+max_statCaspase_3<- surv_cutpoint(
+    data = tcga_merged ,
+    time = "Followup",   # Column name for follow-up time
+    event = "Event",     # Column name for event status
+    variables = "Caspase_3" # Column name for the muscle variable
+)
+
+
+plot(max_statCaspase_3)
+
+# Apply the cutpoint 
+tcga_merged$Caspase_3_group <- ifelse(tcga_merged$Caspase_3 >= max_statCaspase_3$cutpoint$cutpoint, "Low", "High")
+
+
+# Plot the survival curves
+ggsurvplot(
+    fit = survfit(surv_object ~ Caspase_3_group, data = tcga_merged),
+    data = tcga_merged,
+    pval = TRUE,          # Show p-value
+    risk.table = TRUE,    # Show risk table
+    ggtheme = theme_minimal(),  # Use a minimal theme
+    title = "Survival Curves by Caspase_3 Group",
+    xlab = "Time (Days)", # X-axis label
+    ylab = "Survival Probability", # Y-axis label
+    legend.title = "Caspase_3 Group",
+    legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+
+
+```
+
+
+#significant proteins categorization by optimal cutoffs based on survival ACC1
+```{r}
+# Perform surv_cutpoint analysis on the filtered dataset
+max_statACC1<- surv_cutpoint(
+    data = tcga_merged ,
+    time = "Followup",   # Column name for follow-up time
+    event = "Event",     # Column name for event status
+    variables = "ACC1" # Column name for the muscle variable
+)
+
+
+plot(max_statACC1)
+
+# Apply the cutpoint 
+tcga_merged$ACC1_group <- ifelse(tcga_merged$ACC1 >= max_statACC1$cutpoint$cutpoint, "Low", "High")
+
+
+# Plot the survival curves
+ggsurvplot(
+    fit = survfit(surv_object ~ ACC1_group, data = tcga_merged),
+    data = tcga_merged,
+    pval = TRUE,          # Show p-value
+    risk.table = TRUE,    # Show risk table
+    ggtheme = theme_minimal(),  # Use a minimal theme
+    title = "Survival Curves by ACC1 Group",
+    xlab = "Time (Days)", # X-axis label
+    ylab = "Survival Probability", # Y-axis label
+    legend.title = "ACC1 Group",
+    legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+
+
+```
+
+
+#significant proteins categorization by optimal cutoffs based on survival eEF2
+```{r}
+# Perform surv_cutpoint analysis on the filtered dataset
+max_stateEF2<- surv_cutpoint(
+    data = tcga_merged ,
+    time = "Followup",   # Column name for follow-up time
+    event = "Event",     # Column name for event status
+    variables = "eEF2" # Column name for the muscle variable
+)
+
+
+plot(max_stateEF2)
+
+# Apply the cutpoint 
+tcga_merged$eEF2_group <- ifelse(tcga_merged$eEF2 >= max_stateEF2$cutpoint$cutpoint, "Low", "High")
+
+
+# Plot the survival curves
+ggsurvplot(
+    fit = survfit(surv_object ~ eEF2_group, data = tcga_merged),
+    data = tcga_merged,
+    pval = TRUE,          # Show p-value
+    risk.table = TRUE,    # Show risk table
+    ggtheme = theme_minimal(),  # Use a minimal theme
+    title = "Survival Curves by eEF2 Group",
+    xlab = "Time (Days)", # X-axis label
+    ylab = "Survival Probability", # Y-axis label
+    legend.title = "eEF2 Group",
+    legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+
+
+```
+
+
+#significant proteins categorization by optimal cutoffs based on survival ASNS
+```{r}
+# Perform surv_cutpoint analysis on the filtered dataset
+max_statASNS<- surv_cutpoint(
+    data = tcga_merged ,
+    time = "Followup",   # Column name for follow-up time
+    event = "Event",     # Column name for event status
+    variables = "ASNS" # Column name for the muscle variable
+)
+
+
+plot(max_statASNS)
+
+# Apply the cutpoint 
+tcga_merged$ASNS_group <- ifelse(tcga_merged$ASNS >= max_statASNS$cutpoint$cutpoint, "Low", "High")
+
+
+# Plot the survival curves
+ggsurvplot(
+    fit = survfit(surv_object ~ ASNS_group, data = tcga_merged),
+    data = tcga_merged,
+    pval = TRUE,          # Show p-value
+    risk.table = TRUE,    # Show risk table
+    ggtheme = theme_minimal(),  # Use a minimal theme
+    title = "Survival Curves by ASNS Group",
+    xlab = "Time (Days)", # X-axis label
+    ylab = "Survival Probability", # Y-axis label
+    legend.title = "ASNS Group",
+    legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+
+
+```
+
+
+#significant proteins categorization by optimal cutoffs based on survival AR
+```{r}
+# Perform surv_cutpoint analysis on the filtered dataset
+max_statAR<- surv_cutpoint(
+    data = tcga_merged ,
+    time = "Followup",   # Column name for follow-up time
+    event = "Event",     # Column name for event status
+    variables = "AR" # Column name for the muscle variable
+)
+
+
+plot(max_statAR)
+
+# Apply the cutpoint 
+tcga_merged$AR_group <- ifelse(tcga_merged$AR >= max_statAR$cutpoint$cutpoint, "Low", "High")
+
+
+# Plot the survival curves
+ggsurvplot(
+    fit = survfit(surv_object ~ AR_group, data = tcga_merged),
+    data = tcga_merged,
+    pval = TRUE,          # Show p-value
+    risk.table = TRUE,    # Show risk table
+    ggtheme = theme_minimal(),  # Use a minimal theme
+    title = "Survival Curves by AR Group",
+    xlab = "Time (Days)", # X-axis label
+    ylab = "Survival Probability", # Y-axis label
+    legend.title = "AR Group",
+    legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+
+
+```
+
+
+#significant proteins categorization by optimal cutoffs based on survival Jak2
+```{r}
+# Perform surv_cutpoint analysis on the filtered dataset
+max_statJak2<- surv_cutpoint(
+    data = tcga_merged ,
+    time = "Followup",   # Column name for follow-up time
+    event = "Event",     # Column name for event status
+    variables = "Jak2" # Column name for the muscle variable
+)
+
+
+plot(max_statJak2)
+
+# Apply the cutpoint 
+tcga_merged$Jak2_group <- ifelse(tcga_merged$Jak2 >= max_statJak2$cutpoint$cutpoint, "Low", "High")
+
+
+# Plot the survival curves
+ggsurvplot(
+    fit = survfit(surv_object ~ Jak2_group, data = tcga_merged),
+    data = tcga_merged,
+    pval = TRUE,          # Show p-value
+    risk.table = TRUE,    # Show risk table
+    ggtheme = theme_minimal(),  # Use a minimal theme
+    title = "Survival Curves by Jak2 Group",
+    xlab = "Time (Days)", # X-axis label
+    ylab = "Survival Probability", # Y-axis label
+    legend.title = "Jak2 Group",
+    legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+
+
+```
+
+
+#significant proteins categorization by optimal cutoffs based on survival cIAP
+```{r}
+# Perform surv_cutpoint analysis on the filtered dataset
+max_statcIAP<- surv_cutpoint(
+    data = tcga_merged ,
+    time = "Followup",   # Column name for follow-up time
+    event = "Event",     # Column name for event status
+    variables = "cIAP" # Column name for the muscle variable
+)
+
+
+plot(max_statcIAP)
+
+# Apply the cutpoint 
+tcga_merged$cIAP_group <- ifelse(tcga_merged$cIAP >= max_statcIAP$cutpoint$cutpoint, "Low", "High")
+
+
+# Plot the survival curves
+ggsurvplot(
+    fit = survfit(surv_object ~ cIAP_group, data = tcga_merged),
+    data = tcga_merged,
+    pval = TRUE,          # Show p-value
+    risk.table = TRUE,    # Show risk table
+    ggtheme = theme_minimal(),  # Use a minimal theme
+    title = "Survival Curves by cIAP Group",
+    xlab = "Time (Days)", # X-axis label
+    ylab = "Survival Probability", # Y-axis label
+    legend.title = "cIAP Group",
+    legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+
+
+```
+
+
+#significant proteins categorization by optimal cutoffs based on survival Bak
+```{r}
+# Perform surv_cutpoint analysis on the filtered dataset
+max_statBak<- surv_cutpoint(
+    data = tcga_merged ,
+    time = "Followup",   # Column name for follow-up time
+    event = "Event",     # Column name for event status
+    variables = "Bak" # Column name for the muscle variable
+)
+
+
+plot(max_statBak)
+
+# Apply the cutpoint 
+tcga_merged$Bak_group <- ifelse(tcga_merged$Bak >= max_statBak$cutpoint$cutpoint, "Low", "High")
+
+
+# Plot the survival curves
+ggsurvplot(
+    fit = survfit(surv_object ~ Bak_group, data = tcga_merged),
+    data = tcga_merged,
+    pval = TRUE,          # Show p-value
+    risk.table = TRUE,    # Show risk table
+    ggtheme = theme_minimal(),  # Use a minimal theme
+    title = "Survival Curves by Bak Group",
+    xlab = "Time (Days)", # X-axis label
+    ylab = "Survival Probability", # Y-axis label
+    legend.title = "Bak Group",
+    legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+
+
+```
+
+
+#significant proteins categorization by optimal cutoffs based on survival CA9
+```{r}
+# Perform surv_cutpoint analysis on the filtered dataset
+max_statCA9<- surv_cutpoint(
+    data = tcga_merged ,
+    time = "Followup",   # Column name for follow-up time
+    event = "Event",     # Column name for event status
+    variables = "CA9" # Column name for the muscle variable
+)
+
+
+plot(max_statCA9)
+
+# Apply the cutpoint 
+tcga_merged$CA9_group <- ifelse(tcga_merged$CA9 >= max_statCA9$cutpoint$cutpoint, "Low", "High")
+
+
+# Plot the survival curves
+ggsurvplot(
+    fit = survfit(surv_object ~ CA9_group, data = tcga_merged),
+    data = tcga_merged,
+    pval = TRUE,          # Show p-value
+    risk.table = TRUE,    # Show risk table
+    ggtheme = theme_minimal(),  # Use a minimal theme
+    title = "Survival Curves by CA9 Group",
+    xlab = "Time (Days)", # X-axis label
+    ylab = "Survival Probability", # Y-axis label
+    legend.title = "CA9 Group",
+    legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+
+
+```
+
+
+#significant proteins categorization by optimal cutoffs based on survival IRF_1
+```{r}
+# Perform surv_cutpoint analysis on the filtered dataset
+max_statIRF_1<- surv_cutpoint(
+    data = tcga_merged ,
+    time = "Followup",   # Column name for follow-up time
+    event = "Event",     # Column name for event status
+    variables = "IRF_1" # Column name for the muscle variable
+)
+
+
+plot(max_statIRF_1)
+
+# Apply the cutpoint 
+tcga_merged$IRF_1_group <- ifelse(tcga_merged$IRF_1 >= max_statIRF_1$cutpoint$cutpoint, "Low", "High")
+
+
+# Plot the survival curves
+ggsurvplot(
+    fit = survfit(surv_object ~ IRF_1_group, data = tcga_merged),
+    data = tcga_merged,
+    pval = TRUE,          # Show p-value
+    risk.table = TRUE,    # Show risk table
+    ggtheme = theme_minimal(),  # Use a minimal theme
+    title = "Survival Curves by IRF_1 Group",
+    xlab = "Time (Days)", # X-axis label
+    ylab = "Survival Probability", # Y-axis label
+    legend.title = "IRF_1 Group",
+    legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+
+
+```
+
+
+#significant proteins categorization by optimal cutoffs based on survival Myosin_IIa_pS1943 
+```{r}
+# Perform surv_cutpoint analysis on the filtered dataset
+max_statMyosin_IIa_pS1943<- surv_cutpoint(
+    data = tcga_merged ,
+    time = "Followup",   # Column name for follow-up time
+    event = "Event",     # Column name for event status
+    variables = "Myosin_IIa_pS1943" # Column name for the muscle variable
+)
+
+
+plot(max_statMyosin_IIa_pS1943)
+
+# Apply the cutpoint 
+tcga_merged$Myosin_IIa_pS1943_group <- ifelse(tcga_merged$Myosin_IIa_pS1943 >= max_statMyosin_IIa_pS1943$cutpoint$cutpoint, "Low", "High")
+
+
+# Plot the survival curves
+ggsurvplot(
+    fit = survfit(surv_object ~ Myosin_IIa_pS1943_group, data = tcga_merged),
+    data = tcga_merged,
+    pval = TRUE,          # Show p-value
+    risk.table = TRUE,    # Show risk table
+    ggtheme = theme_minimal(),  # Use a minimal theme
+    title = "Survival Curves by Myosin_IIa_pS1943 Group",
+    xlab = "Time (Days)", # X-axis label
+    ylab = "Survival Probability", # Y-axis label
+    legend.title = "Myosin_IIa_pS1943 Group",
+    legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+
+
+```
+
+
+#significant proteins categorization by optimal cutoffs based on survival CD31
+```{r}
+# Perform surv_cutpoint analysis on the filtered dataset
+max_statCD31<- surv_cutpoint(
+    data = tcga_merged ,
+    time = "Followup",   # Column name for follow-up time
+    event = "Event",     # Column name for event status
+    variables = "CD31" # Column name for the muscle variable
+)
+
+
+plot(max_statCD31)
+
+# Apply the cutpoint 
+tcga_merged$CD31_group <- ifelse(tcga_merged$CD31 >= max_statCD31$cutpoint$cutpoint, "Low", "High")
+
+
+# Plot the survival curves
+ggsurvplot(
+    fit = survfit(surv_object ~ CD31_group, data = tcga_merged),
+    data = tcga_merged,
+    pval = TRUE,          # Show p-value
+    risk.table = TRUE,    # Show risk table
+    ggtheme = theme_minimal(),  # Use a minimal theme
+    title = "Survival Curves by CD31 Group",
+    xlab = "Time (Days)", # X-axis label
+    ylab = "Survival Probability", # Y-axis label
+    legend.title = "CD31 Group",
+    legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+
+
+```
+
+
+#significant proteins categorization by optimal cutoffs based on survival Cyclin_D1
+```{r}
+# Perform surv_cutpoint analysis on the filtered dataset
+max_statCyclin_D1<- surv_cutpoint(
+    data = tcga_merged ,
+    time = "Followup",   # Column name for follow-up time
+    event = "Event",     # Column name for event status
+    variables = "Cyclin_D1" # Column name for the muscle variable
+)
+
+
+plot(max_statCyclin_D1)
+
+# Apply the cutpoint 
+tcga_merged$Cyclin_D1_group <- ifelse(tcga_merged$Cyclin_D1 >= max_statCyclin_D1$cutpoint$cutpoint, "Low", "High")
+
+
+# Plot the survival curves
+ggsurvplot(
+    fit = survfit(surv_object ~ Cyclin_D1_group, data = tcga_merged),
+    data = tcga_merged,
+    pval = TRUE,          # Show p-value
+    risk.table = TRUE,    # Show risk table
+    ggtheme = theme_minimal(),  # Use a minimal theme
+    title = "Survival Curves by Cyclin_D1 Group",
+    xlab = "Time (Days)", # X-axis label
+    ylab = "Survival Probability", # Y-axis label
+    legend.title = "Cyclin_D1 Group",
+    legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+
+
+```
+
+
+
+#significant proteins categorization by optimal cutoffs based on survival ACC_pS79
+```{r}
+# Perform surv_cutpoint analysis on the filtered dataset
+max_statACC_pS79<- surv_cutpoint(
+    data = tcga_merged ,
+    time = "Followup",   # Column name for follow-up time
+    event = "Event",     # Column name for event status
+    variables = "ACC_pS79" # Column name for the muscle variable
+)
+
+
+plot(max_statACC_pS79)
+
+# Apply the cutpoint 
+tcga_merged$ACC_pS79_group <- ifelse(tcga_merged$ACC_pS79 >= max_statACC_pS79$cutpoint$cutpoint, "Low", "High")
+
+
+# Plot the survival curves
+ggsurvplot(
+    fit = survfit(surv_object ~ ACC_pS79_group, data = tcga_merged),
+    data = tcga_merged,
+    pval = TRUE,          # Show p-value
+    risk.table = TRUE,    # Show risk table
+    ggtheme = theme_minimal(),  # Use a minimal theme
+    title = "Survival Curves by ACC_pS79 Group",
+    xlab = "Time (Days)", # X-axis label
+    ylab = "Survival Probability", # Y-axis label
+    legend.title = "ACC_pS79 Group",
+    legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+
+
+```
+
+
+
+#significant proteins categorization by optimal cutoffs based on survival PREX1
+```{r}
+# Perform surv_cutpoint analysis on the filtered dataset
+max_statPREX1<- surv_cutpoint(
+    data = tcga_merged ,
+    time = "Followup",   # Column name for follow-up time
+    event = "Event",     # Column name for event status
+    variables = "PREX1" # Column name for the muscle variable
+)
+
+
+plot(max_statPREX1)
+
+# Apply the cutpoint 
+tcga_merged$PREX1_group <- ifelse(tcga_merged$PREX1 >= max_statPREX1$cutpoint$cutpoint, "Low", "High")
+
+
+# Plot the survival curves
+ggsurvplot(
+    fit = survfit(surv_object ~ PREX1_group, data = tcga_merged),
+    data = tcga_merged,
+    pval = TRUE,          # Show p-value
+    risk.table = TRUE,    # Show risk table
+    ggtheme = theme_minimal(),  # Use a minimal theme
+    title = "Survival Curves by PREX1 Group",
+    xlab = "Time (Days)", # X-axis label
+    ylab = "Survival Probability", # Y-axis label
+    legend.title = "PREX1 Group",
+    legend.labs = c("Low", "High"), # Labels for the groups
+palette = c("#20B2AA", "red")  # Low = bluish green, High = red
+)
+
+
+```
+
+```{r}
+# Export to SAS file
+write.csv(tcga_merged, "tcga_r.csv", row.names = FALSE)
+
+```
+
+
